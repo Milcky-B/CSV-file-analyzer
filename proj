@@ -1,0 +1,465 @@
+#!/bin/bash
+#######################VARIABLES####################
+
+CSV_FILE="csv2.csv"
+SAVE_TO=None
+IFS=","
+WORDS=None
+ROW=None
+COLUMN=None
+LINE_COUNT=None
+BACKUP_FILE=None
+HTML_1=".openTag.html"
+HTML_2=".closeTag.html"
+
+#######################################################
+
+function variableDeclaration(){
+
+LINE_COUNT=$(wc -l < "$CSV_FILE")
+read line < "$CSV_FILE"
+vars=($line)
+ROW=${#vars[@]}
+SAVE_TO=".temp"
+BACKUP_FILE="${SAVE_TO}.bak"
+touch "$SAVE_TO"
+touch "$BACKUP_FILE"
+}
+
+function openFile(){
+CSV_FILE=$(zenity --title "Select CSV file" --file-selection)
+}
+
+function readFile(){
+j=0
+while read line
+do
+vars=($line)
+for var in "${vars[@]}"
+do
+WORDS[$j]="$var"
+j=$[$j+1]
+done
+done <"$CSV_FILE"
+COLUMN=j
+}
+
+function displayFile(){
+j=1
+for word in "${WORDS[@]}"; do
+if [[ "$j" -lt "$ROW" ]]; then
+ echo -n "$word "
+ j=$[$j+1]
+else
+ echo "$word"
+ j=1
+fi
+done
+
+echo "Press Key To Continue"
+     read stg
+     showMessage
+}
+
+function Exit(){
+if [ -e $SAVE_TO ]; then
+rm "$SAVE_TO"
+rm "$BACKUP_FILE"
+fi
+$(whiptail --msgbox --title "Good Bye" "Hope you enjoyed the program" 10 50 3>&1 1>&2 2>&3 )
+}
+
+function showHeader(){
+for (( i=0 ; i<$ROW ; i++ ))do
+	echo "$i) ${WORDS[$i]}"
+done
+}
+
+function minMaxValue(){
+clear
+showHeader
+
+read -p "Enter column number you want to work on: " colVal
+if [ $colVal -gt $ROW ]; then
+$(whiptail --msgbox --title "Error" "Sorry column number you inserted is wrong, Try Again!" 10 50 3>&1 1>&2 2>&3 )
+minMaxValue
+fi
+
+min=${WORDS[$((colVal + ROW))]}
+max=${WORDS[$((colVal + ROW))]}
+
+if [[ ! "$min" =~ ^[0-9]+$ ]]; then
+  $(whiptail --msgbox --title "Error" "Sorry column you chose is not of  numerical value" 10 50 3>&1 1>&2 2>&3 )
+  minMaxValue
+fi
+
+for (( i=$((colVal + ROW)) ; i<$COLUMN ; i+=$ROW)) do
+  if [[ ${WORDS[$i]} -lt $min ]]; then
+    min=${WORDS[$i]}
+  fi
+
+  if [[ ${WORDS[$i]} -gt $max ]]; then
+    max=${WORDS[$i]}
+  fi
+done
+
+$(whiptail --msgbox --title "Values" "Minimum & Maximum value for ${WORDS[$colVal]} is $min & $max respectively" 10 70 3>&1 1>&2 2>&3 )
+
+
+if whiptail --title "Save" --yesno "Would you like to write this to a file" 10 50; then
+echo "Minimum & Maximum value for ${WORDS[$colVal]} is $min & $max respectively" >> $SAVE_TO
+tar -uf "$BACKUP_FILE" "$SAVE_TO"
+fi
+}
+
+function frequentValue(){
+clear
+showHeader
+read -p "Enter column number you want to work on: " colVal
+if [ $colVal -gt $ROW ]; then
+$(whiptail --msgbox --title "Error" "Sorry column number you inserted is wrong, Try Again!" 10 50 3>&1 1>&2 2>&3 )
+frequentValue
+fi
+
+max_count=0
+frequent_value=None
+
+for (( i=$((colVal + ROW)) ; i<$COLUMN ; i+=$ROW))  do
+count=$(echo "${WORDS[@]}" | grep -c "${WORDS[$i]}")
+if [[ $count -gt $max_count ]]; then
+max_count=$count
+frequent_value=${WORDS[$i]}
+fi
+done
+
+$(whiptail --msgbox --title "Values" "Frequent value for ${WORDS[$colVal]} is $frequent_value" 10 60 3>&1 1>&2 2>&3 )
+
+
+if whiptail --title "Save" --yesno "Would you like to write this to a file" 10 50; then
+echo "Frequent value for ${WORDS[$colVal]} is $frequent_value" >> $SAVE_TO
+tar -uf "$BACKUP_FILE" "$SAVE_TO"
+fi
+}
+
+function analysisCalc(){
+clear
+showHeader
+colVal=0
+read -p "Enter column number you want to work on: " colVal
+
+if [ $colVal -ge $ROW ]; then
+  $(whiptail --msgbox --title "Error" "Sorry column number you inserted is wrong, Try Again!" 10 50 3>&1 1>&2 2>&3 )
+  analysisCalc
+fi
+
+firstVal=${WORDS[$((colVal + ROW))]}
+
+if [[ ! "$firstVal" =~ ^[0-9]+$ ]]; then
+  $(whiptail --msgbox --title "Error" "Sorry column you chose is not of numerical value, Try Again!" 10 50 3>&1 1>&2 2>&3 )
+  analysisCalc
+fi
+
+tempArr=None
+c=0
+sum=0
+count=0
+squared_distances=0
+
+for (( i=$((colVal + ROW)) ; i<$COLUMN ; i+=$ROW)) do
+	tempArr[$c]="${WORDS[$i]}"
+	c=$[$c+1]
+done
+
+for value in "${tempArr[@]}" ; do
+    sum=$((sum + value))
+    count=$((count + 1))
+done
+
+mean=$((sum / count))
+
+#for value in "${tempArr[@]}" ; do
+#squared_distances=$((squared_distances + $((value - $mean)^2))
+#done
+
+  if [ $((count % 2)) -eq 0 ]; then
+    median=$(echo "${tempArr[@]}" | sort | awk -F' ' '{print $'"$((count / 2))"'}')
+  else
+   median=$(echo "${tempArr[@]}" | sort | awk -F' ' '{print $'"$((count / 2))"'}')
+  fi
+
+#  standard_deviation=$(echo "sqrt($squared_distances / $count)" | bc)
+
+$(whiptail --msgbox --title "Values" " The mean=$mean & median=$median for column ${WORDS[$colVal]}" 10 60 3>&1 1>&2 2>&3 )
+
+
+if whiptail --title "Save" --yesno "Would you like to write this to a file" 10 50; then
+echo "The mean=$mean & median=$median for column ${WORDS[$colVal]}" >> $SAVE_TO
+tar -uf "$BACKUP_FILE" "$SAVE_TO"
+fi
+
+}
+
+function displayIndex(){
+for (( i=10 ; i<$COLUMN ; i+=$ROW))do
+ echo "${WORDS[$i]}"
+done
+}
+
+
+function uniqueValue(){
+
+clear
+showHeader
+read -p "Which Column Do You Want to work on" col
+
+if [ $col = "Index" ];
+then
+cat $CSV_FILE | cut -f 1 -d , | sort -u
+elif [ $col = "User Id" ];
+then
+cat $CSV_FILE |cut -f 2 -d , | sort -u 
+elif [ $col = "First Name" ];
+then
+#awk '{print $3}' $CSV_FILE | sort -u
+cat $CSV_FILE | cut -f 3 -d , | sort -u 
+elif [ $col = "Last Name" ];
+then
+cat  $CSV_FILE | cut -f 4 -d , | sort -u
+elif [ $col = "Sex" ];
+then
+cat $CSV_FILE | cut -f 5 -d , | sort -u
+elif [ $col = "Email" ];
+then
+cat $CSV_FILE | cut -f 6 -d , | sort -u
+elif [ $col = "Phone" ];
+then
+cat $CSV_FILE | cut -f 7 -d , | sort -u
+elif [ $col = "Date of birth" ];
+then
+cat $CSV_FILE | cut -f 8 -d , | sort -u
+elif [ $col = "Job Title" ];
+then
+cat $CSV_FILE | cut -f 9 -d , | sort -u
+elif [ $col = "Age" ];
+then
+cat $CSV_FILE | cut -f 10 -d , | sort -u
+elif [ $col = "Price Per Unit" ];
+then
+cat $CSV_FILE | cut -f 11 -d , | sort -u
+elif [ $col = "Unit Sold" ];
+then
+cat $CSV_FILE | cut -f 12 -d , | sort -u
+elif [ $col = "Salary" ];
+then
+cat $CSV_FILE | cut -f 13 -d , | sort -u
+elif [ $col = "Country" ];
+then
+cat $CSV_FILE | cut -f 14 -d , | sort -u
+elif [ $col = "State" ];
+then
+cat $CSV_FILE | cut -f 15 -d , | sort -u
+
+else
+echo "please enter the correct column"
+fi
+
+}
+
+
+
+
+function filter(){
+clear
+showHeader
+colVal=0
+
+read -p "Enter column number you want to work on: " colVal
+
+if [ $colVal -ge $ROW ]; then
+  $(whiptail --msgbox --title "Error" "Sorry column number you inserted is wrong, Try Again!" 10 50 3>&1 1>&2 2>&3 )
+  filter
+fi
+
+firstVal=${WORDS[$((colVal + ROW))]}
+
+if [[ ! "$firstVal" =~ ^[0-9]+$ ]]; then
+  $(whiptail --msgbox --title "Error" "Sorry column you chose is not of numerical value, Try Again!" 10 50 3>&1 1>&2 2>&3 )
+  filter
+fi
+
+read -p "Do you wish to find: 1.Less 2.Greater 3.Equal " options 
+
+read -p "Enter the filter value: " filter_value
+
+declare -a filtered_csv_data
+
+case "$options" in
+1)
+	while read line; do
+  	fields=($line)
+  	column_value="${fields[$colVal]}"
+  	if [[ "$column_value" -lt "$filter_value" ]]; then
+    	filtered_csv_data=("${filtered_csv_data[@]}" "$line")
+  	fi
+	done < "$CSV_FILE"
+	;;
+2)
+	while read line; do
+  	fields=($line)
+  	column_value="${fields[$colVal]}"
+  	if [[ "$column_value" -gt  "$filter_value" ]]; then
+    	filtered_csv_data=("${filtered_csv_data[@]}" "$line")
+  	fi
+	done < "$CSV_FILE"
+;;
+3)
+	while read line; do
+  	fields=($line)
+	column_value="${fields[$colVal]}"
+  	if [[ "$column_value" -eq  "$filter_value" ]]; then
+    	filtered_csv_data=("${filtered_csv_data[@]}" "$line")
+	fi
+	done < "$CSV_FILE"
+	;;
+*)
+	$(whiptail --msgbox --title "Error" "Incorrect Choice, Try Again!" 10 50 3>&1 1>&2 2>&3 )
+  	filter
+esac
+echo "The filtered CSV data is: "
+for line in "${filtered_csv_data[@]}"; do
+  echo "$line"
+done
+}
+
+function Sort(){
+
+clear
+showHeader
+read -p "which column Do you want to sort " column
+
+if [ $column = "Index" ];
+then
+sort -V  $CSV_FILE
+elif [ $column = "User Id" ];
+then
+sort -t"," -d  -k 2   $CSV_FILE
+sort -c $CSV_FILE
+elif [ $column = "First Name" ];
+then
+sort -t"," -k 3 -d  $CSV_FILE
+elif [ $column = "Last Name" ];
+then
+sort -t"," -k 4 -d $CSV_FILE
+elif [ $column = "Sex" ];
+then
+sort -t"," -k 5 -d $CSV_FILE
+elif [ $column = "Email" ];
+then
+sort -t"," -k 6 -d $CSV_FILE
+elif [ $column = "Phone" ];
+then
+sort -t"," -k 7 -n $CSV_FILE
+elif [ $column = "Date of birth" ];
+then
+sort -t"," -k 8 -d $CSV_FILE
+elif [ $column = "Job Title" ];
+then
+sort -t"," -k 9 -d $CSV_FILE
+sort -c $CSV_FILE
+elif [ $column = "Age" ];
+then
+sort -t"," -k 10 -d $CSV_FILE
+elif [ $column = "Price Per Unit" ];
+then
+sort -t"," -k 11 -g $CSV_FILE
+elif [ $column = "Unit Sold" ];
+then
+sort -t"," -k 12 -g $CSV_FILE
+elif [ $column = "Salary" ];
+then
+sort -t"," -k 13 -n   $CSV_FILE
+elif [ $column = " Country " ];
+then
+sort -t"," -k 14 -d $CSV_FILE
+elif [ $column = " State " ];
+then
+sort -t"," -k 15 -d $CSV_FILE
+
+else
+echo "please enter the correct column"
+
+fi
+
+ echo "press any key to continue"
+     read stg
+     showMessage
+
+}
+
+
+function saveToFile(){
+newFile=$(whiptail --inputbox "Please Enter File Name" 10 50 3>&1 1>&2 2>&3)
+if [ -e "$newFile" ]; then
+$(whiptail --msgbox --title "Try Again!" "File name already exists!" 10 50 3>&1 1>&2 2>&3 )
+saveToFile
+fi
+
+if whiptail --title "Save" --yesno "Would you like to save file as HTML" 10 50; then
+newFile="$newFile.html" 
+cat "$HTML_1" > "$newFile"
+cat "$SAVE_TO" >> "$newFile"
+cat "$HTML_2" >> "$newFile"
+else
+cat "$SAVE_TO" > "$newFile"
+fi
+}
+
+
+function showMessage(){
+clear
+Choice=0
+Choice=$(whiptail --menu "Choose an option" 18 100 10 \
+  "1" "Display Number Of Rows & Columns" \
+  "2" "List Unique Values Of A Column" \
+  "3" "Display Header Names" \
+  "4" "Minimum & Maximum Value Of A Column" \
+  "5" "Display Frequent Value Of A Column" \
+  "6" "Calculate Mean & Median & Standard Deviation" \
+  "7" "Filter Column Based On User Preference" \
+  "8" "Sort based Of A Column" \
+  "9" "Save To File" 3>&1 1>&2 2>&3)
+
+case "$Choice" in
+  1) $(whiptail --msgbox --title "Values" "The File has a row of: $LINE_COUNT && column of: $ROW " 10 60 3>&1 1>&2 2>&3 )
+     showMessage ;;
+  2) uniqueValue
+     echo "press any key to continue"
+     read stg
+     showMessage ;;
+  3) showHeader
+     echo "Press Key To Continue"
+     read stg2
+     showMessage ;;
+  4) minMaxValue
+     showMessage ;;
+  5) frequentValue
+     showMessage ;;
+  6) analysisCalc
+     showMessage ;;
+  7) filter 
+     echo "Press Key To Continue"
+     read stg3
+     showMessage ;;
+  8) Sort
+     echo "Press Key To Continue"
+     read stg3
+     showMessage ;;
+  9) saveToFile
+     showMessage ;;
+esac
+}
+
+openFile
+variableDeclaration
+readFile
+showMessage
